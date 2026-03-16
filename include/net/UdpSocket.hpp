@@ -17,6 +17,8 @@ public:
     ssize_t recvfrom(void* buffer, size_t length, InetAddress& src_addr);
 
     void set_broadcast(bool on);
+    
+    int native_handle() const { return fd(); }
 };
 
 } // namespace net
