@@ -27,9 +27,9 @@ namespace net {
         CloseCallback m_onClose;
         TcpClient::ErrorCallback m_onError;
         bool m_connecting;
-    }
+    };
 
-    Connector::Connector(EventLoop* loop) m_loop(loop) {}
+    Connector::Connector(EventLoop* loop) : m_loop(loop) {}
 
     void Connector::start(const InetAddress& addr, 
         TcpClient::ConnectionCallback onConnect,
@@ -132,7 +132,7 @@ namespace net {
     TcpClient::TcpClient(EventLoop* loop) : 
         m_connector(std::make_unique<Connector>(loop)) { }
 
-    TcpClient::~TcpClient = default;
+    TcpClient::~TcpClient() = default;
 
     void TcpClient::connect(const InetAddress& serverAddr, ConnectionCallback onConnect, MessageCallback onMessage,
         CloseCallback onClose, ErrorCallback onError) {

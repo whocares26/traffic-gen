@@ -11,6 +11,8 @@ namespace net {
 class TcpClient {
 public: 
     using ConnectionCallback = std::function<void(const std::shared_ptr<TcpConnection>&)>;
+    using MessageCallback = std::function<void(const std::shared_ptr<TcpConnection>&, std::string&)>;
+    using CloseCallback = std::function<void(const std::shared_ptr<TcpConnection>&)>;
     using ErrorCallback = std::function<void()>;
 
     explicit TcpClient(EventLoop* loop);
