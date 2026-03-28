@@ -1,48 +1,59 @@
 #include "net/ThreadPool.hpp"
+#include <stdexcept>
 
 namespace net {
 
-ThreadPool::ThreadPool(int num_threads, LoopCreator loop_creator) 
-        : m_num_threads(num_threads), m_loop_creator(loop_creator) {
-            if (num_threads <= 0) {
-                throw std::runtime_error{"ThreadPool: construct failed, negative num of threads"};
-            }
+ThreadPool::ThreadPool(int num_threads) : m_num_threads(num_threads) {
+    if (num_threads <= 0)
+        throw std::runtime_error{"ThreadPool: num_threads must be > 0"};
 }
 
 void ThreadPool::start() {
-    if (!m_started) {
-        m_threads.reserve(m_num_threads);
-        m_loops.reserve(m_num_threads);
-        for (size_t i = 0; i < m_num_threads; i++) {
-            auto tcp_server = m_loop_creator();
-            m_loops.push_back(tcp_server->get_loop());
-            m_threads.emplace_back([server = std::move(tcp_server)]() {
-                server->start();
-                server->get_loop()->run();
-            });
-        }
-        m_started = true;
-    }
+    m_running = true;
+    m_threads.reserve(m_num_threads);
+    for (int i = 0; i < m_num_threads; ++i)
+        m_threads.emplace_back([this]{ workerLoop(); });
 }
 
 void ThreadPool::stop() {
-    if (m_started) {
-        if (!m_stopped) {
-            for (size_t i = 0; i < m_num_threads; i++) {
-                m_loops[i]->stop();
-            }
-            for (size_t i = 0; i < m_num_threads; i++) {
-                m_threads[i].join();
-            }
+    {
+        std::lock_guard lock(m_mutex);
+        m_running = false;
+    }
+    m_cv.notify_all();
+    for (auto& t : m_threads)
+        if (t.joinable()) t.join();
+    m_threads.clear();
+}
+
+void ThreadPool::submit(std::function<void()> task) {
+    {
+        std::lock_guard lock(m_mutex);
+        m_tasks.push(std::move(task));
+    }
+    m_cv.notify_one();
+}
+
+void ThreadPool::workerLoop() {
+    while (true) {
+        std::function<void()> task;
+        {
+            std::unique_lock lock(m_mutex);
+            m_cv.wait(lock, [this]{
+                return !m_tasks.empty() || !m_running;
+            });
+
+            if (!m_running && m_tasks.empty()) return;
+
+            task = std::move(m_tasks.front());
+            m_tasks.pop();
         }
-        m_stopped = true;
+        task();
     }
 }
 
 ThreadPool::~ThreadPool() {
-    if (m_started && !m_stopped) {
-        stop();
-    }
+    if (m_running) stop();
 }
 
 }

@@ -1,36 +1,33 @@
 #pragma once
-
 #include <vector>
 #include <thread>
-#include <memory>
-#include <exception>
-#include "net/EventLoop.hpp"
-#include "net/TcpServer.hpp"
+#include <queue>
+#include <functional>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
 
 namespace net {
 
 class ThreadPool {
 public:
-    using LoopCreator = std::function<std::unique_ptr<TcpServer>()>;
-    ThreadPool(int num_threads, LoopCreator loop_creator);
-
-    void start();
-
-    void stop();
-    
-    std::vector<EventLoop*>& getLoops() { return m_loops; }
-    const std::vector<EventLoop*>& getLoops() const { return m_loops; }
-
+    explicit ThreadPool(int num_threads);
     ~ThreadPool();
 
-private:
-    const int m_num_threads;
-    const LoopCreator m_loop_creator;
+    void start();
+    void stop();
 
-    std::vector<EventLoop*> m_loops;
-    std::vector<std::thread> m_threads;
-    bool m_started = false;
-    bool m_stopped = false;
+    void submit(std::function<void()> task);
+
+private:
+    void workerLoop();
+
+    const int                        m_num_threads;
+    std::vector<std::thread>         m_threads;
+    std::queue<std::function<void()>> m_tasks;
+    std::mutex                       m_mutex;
+    std::condition_variable          m_cv;
+    std::atomic<bool>                m_running{false};
 };
 
 }
