@@ -17,6 +17,7 @@ EventLoop::EventLoop() :  m_running(false) {
     add_fd(m_stop_fd, EPOLLIN, [this](uint32_t events) {
         uint64_t dummy;
         read(m_stop_fd, &dummy, sizeof(dummy));
+        m_running = false;
     });
 }
 EventLoop::~EventLoop() {
