@@ -104,17 +104,23 @@ void TcpConnection::handle_write() {
 }
 
 void TcpConnection::handle_close() {
+    // Удержание себя до конца метода: remove_fd уничтожает лямбду в EventLoop,
+    // которая держала [self = shared_from_this()], а m_close_cb стирает нас
+    // из TcpServer::m_connections. Без guard это может уронить refcount до 0
+    // прямо посреди метода.
+    auto guard = shared_from_this();
     m_state = Disconnected;
     m_loop->remove_fd(m_client_socket->fd());
-    if (m_close_cb)      m_close_cb(shared_from_this());
-    if (m_connection_cb) m_connection_cb(shared_from_this());
+    if (m_close_cb)      m_close_cb(guard);
+    if (m_connection_cb) m_connection_cb(guard);
 }
 
 void TcpConnection::connection_destroyed() {
+    auto guard = shared_from_this();
     if (m_state == Connected)
         m_state = Disconnected;
     m_loop->remove_fd(m_client_socket->fd());
-    if (m_connection_cb) m_connection_cb(shared_from_this());
+    if (m_connection_cb) m_connection_cb(guard);
 }
 
 void TcpConnection::shutdown() {

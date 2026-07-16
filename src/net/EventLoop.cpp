@@ -98,7 +98,12 @@ void EventLoop::run() {
                 uint32_t flags = events[i].events;
                 auto it = m_callbacks.find(fd);
                 if (it != m_callbacks.end()) {
-                    it->second(flags);
+                    // Копия — колбэк может вызвать remove_fd(fd) для
+                    // самого себя (типичный случай TcpConnection::handle_close);
+                    // тогда std::function из it->second будет уничтожен
+                    // прямо во время вызова, а копия на стеке нас спасает.
+                    auto cb = it->second;
+                    cb(flags);
                 }
             }
         }
